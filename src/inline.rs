@@ -258,10 +258,7 @@ impl TerminalInlineObjects {
                             match load_object_source(Path::new(&path)) {
                                 Ok((source, source_data)) => {
                                     info!("registered RGP object {} from {}", object_id, source);
-                                    self.objects.insert(
-                                        object_id,
-                                        source_data.into(),
-                                    );
+                                    self.objects.insert(object_id, source_data.into());
                                     self.dirty = true;
                                     None
                                 }
@@ -396,10 +393,7 @@ impl TerminalInlineObjects {
         {
             Ok((source, source_data)) => {
                 info!("registered RGP object {} from {}", object_id, source);
-                self.objects.insert(
-                    object_id,
-                    source_data.into(),
-                );
+                self.objects.insert(object_id, source_data.into());
                 self.dirty = true;
                 None
             }
@@ -506,7 +500,7 @@ pub enum RgpInlineObject {
         mesh: Mesh,
         /// This gets created on the fly when it's actually needed.
         /// If you are creating a RgpInlienObject, chances are that you can set this to `None`.
-        handle: Option<Handle<Mesh>>
+        handle: Option<Handle<Mesh>>,
     },
     /// OBJ mesh payload.
     Obj {

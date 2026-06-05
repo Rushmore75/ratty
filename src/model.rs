@@ -29,24 +29,22 @@ pub enum ObjectSource {
     /// glTF scene asset path.
     Gltf(String),
     /// STL, should be similar to OBJ
-    Stl(Mesh)
+    Stl(Mesh),
 }
 
-impl Into<InlineObject> for ObjectSource {
-    fn into(self) -> InlineObject {
-        InlineObject::RgpObject(match self {
-            ObjectSource::Stl(mesh) => RgpInlineObject::Stl { mesh, handle: None},
+impl From<ObjectSource> for InlineObject {
+    fn from(val: ObjectSource) -> Self {
+        InlineObject::RgpObject(match val {
+            ObjectSource::Stl(mesh) => RgpInlineObject::Stl { mesh, handle: None },
             ObjectSource::Obj(meshes) => RgpInlineObject::Obj {
                 meshes,
                 handles: None,
             },
-            ObjectSource::Gltf(asset_path) => {
-                RgpInlineObject::Gltf {
+            ObjectSource::Gltf(asset_path) => RgpInlineObject::Gltf {
                 asset_path,
                 handle: None,
-                }
-            }
-       })
+            },
+        })
     }
 }
 

@@ -785,13 +785,15 @@ fn spawn_rgp_object(
             let mesh_handle = meshes.add(extrude_mesh(mesh.clone(), style.depth));
             *handle = Some(mesh_handle.clone());
 
-            let child = commands.spawn((
+            let child = commands
+                .spawn((
                     Mesh3d(mesh_handle),
                     MeshMaterial3d(material.clone()),
                     Transform::default(),
-                )).id();
+                ))
+                .id();
             commands.entity(root).add_child(child);
-        },
+        }
     }
 }
 

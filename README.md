@@ -134,7 +134,7 @@ to place inline 3D objects in terminal space.
 
 RGP supports:
 
-- registering `.obj` and `.glb` assets by path
+- registering `.obj`, `.glb`, and `.stl` assets by path
 - placing them at terminal cell anchors
 - animation, scale, color, depth and other attributes
 
