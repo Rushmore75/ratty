@@ -6,11 +6,12 @@ use std::path::{Component, Path, PathBuf};
 use anyhow::{Context, bail, ensure};
 use bevy::asset::RenderAssetUsages;
 use bevy::gltf::GltfAssetLabel;
-use bevy::mesh::{Indices, PrimitiveTopology};
+use bevy::mesh::{Indices, PrimitiveTopology, VertexAttributeValues};
 use bevy::prelude::*;
 use rust_embed::RustEmbed;
 
 use crate::config::{AppConfig, CURSOR_DEPTH};
+use crate::inline::{InlineObject, RgpInlineObject};
 use crate::paths::{expand_path, runtime_asset_root};
 
 #[derive(RustEmbed)]
@@ -27,6 +28,26 @@ pub enum ObjectSource {
     Obj(Vec<Mesh>),
     /// glTF scene asset path.
     Gltf(String),
+    /// STL, should be similar to OBJ
+    Stl(Mesh)
+}
+
+impl Into<InlineObject> for ObjectSource {
+    fn into(self) -> InlineObject {
+        InlineObject::RgpObject(match self {
+            ObjectSource::Stl(mesh) => RgpInlineObject::Stl { mesh, handle: None},
+            ObjectSource::Obj(meshes) => RgpInlineObject::Obj {
+                meshes,
+                handles: None,
+            },
+            ObjectSource::Gltf(asset_path) => {
+                RgpInlineObject::Gltf {
+                asset_path,
+                handle: None,
+                }
+            }
+       })
+    }
 }
 
 /// Spawns the configured cursor model.
@@ -118,6 +139,8 @@ pub fn load_object_source(path: &Path) -> anyhow::Result<(String, ObjectSource)>
             .unwrap_or_default();
 
         return match extension.as_str() {
+            "stl" => load_stl_meshes_from_path(path)
+                .map(|mesh| (path.display().to_string(), ObjectSource::Stl(mesh))),
             "obj" => load_obj_meshes_from_path(path)
                 .map(|meshes| (path.display().to_string(), ObjectSource::Obj(meshes))),
             "glb" | "gltf" => {
@@ -295,6 +318,49 @@ fn object_asset_path(path: &Path) -> anyhow::Result<String> {
         .strip_prefix("assets/")
         .unwrap_or(&candidate)
         .to_string())
+}
+
+fn load_stl_meshes_from_path(path: &Path) -> anyhow::Result<Mesh> {
+    let reader = std::fs::read(path)?;
+    let mut c = Cursor::new(reader);
+    let stl = stl_io::read_stl(&mut c)?;
+
+    // credit: bevy_stl (MIT)
+    let mut mesh = Mesh::new(
+        PrimitiveTopology::TriangleList,
+        RenderAssetUsages::default(),
+    );
+
+    let vertex_count = stl.faces.len() * 3;
+
+    let mut positions = Vec::with_capacity(vertex_count);
+    let mut normals = Vec::with_capacity(vertex_count);
+    let mut indices = Vec::with_capacity(vertex_count);
+
+    for (i, face) in stl.faces.iter().enumerate() {
+        for j in 0..3 {
+            let vertex = stl.vertices[face.vertices[j]];
+            positions.push([vertex[0], vertex[1], vertex[2]]);
+            normals.push([face.normal[0], face.normal[1], face.normal[2]]);
+            indices.push((i * 3 + j) as u32);
+        }
+    }
+
+    let uvs = vec![[0.0, 0.0]; vertex_count];
+
+    mesh.insert_attribute(
+        Mesh::ATTRIBUTE_POSITION,
+        VertexAttributeValues::Float32x3(positions),
+    );
+    mesh.insert_attribute(
+        Mesh::ATTRIBUTE_NORMAL,
+        VertexAttributeValues::Float32x3(normals),
+    );
+    mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, VertexAttributeValues::Float32x2(uvs));
+    mesh.insert_indices(Indices::U32(indices));
+    // appropriated code over
+
+    Ok(mesh)
 }
 
 fn load_obj_meshes_from_path(path: &Path) -> anyhow::Result<Vec<Mesh>> {
