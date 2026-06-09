@@ -180,6 +180,7 @@ pub struct TerminalRuntime {
     pub _child: Box<dyn portable_pty::Child + Send + Sync>,
     /// Terminal parser.
     pub parser: Parser<TerminalParserCallbacks>,
+    scrollback_len: usize,
     /// Indicates PTY shutdown.
     pub pty_disconnected: bool,
 }
@@ -345,6 +346,7 @@ impl TerminalRuntime {
                 config.terminal.scrollback,
                 TerminalParserCallbacks::default(),
             ),
+            scrollback_len: config.terminal.scrollback,
             pty_disconnected: false,
         })
     }
@@ -362,7 +364,7 @@ impl TerminalRuntime {
     }
 
     /// Resizes the PTY and parser screen.
-    pub fn resize(&mut self, cols: u16, rows: u16) {
+    pub fn resize(&mut self, cols: u16, rows: u16, pw: u16, ph: u16) {
         if cols == 0 || rows == 0 {
             return;
         }
@@ -370,10 +372,20 @@ impl TerminalRuntime {
         let _ = self._master.resize(PtySize {
             rows,
             cols,
-            pixel_width: 0,
-            pixel_height: 0,
+            pixel_width: pw,
+            pixel_height: ph,
         });
-        self.parser.screen_mut().set_size(rows, cols);
+
+        let (_, old_cols) = self.parser.screen().size();
+        if old_cols == cols || self.parser.screen().alternate_screen() {
+            self.parser.screen_mut().set_size(rows, cols);
+            return;
+        }
+
+        let state = self.parser.screen().state_formatted();
+        let callbacks = std::mem::take(self.parser.callbacks_mut());
+        self.parser = Parser::new_with_callbacks(rows, cols, self.scrollback_len, callbacks);
+        self.parser.process(&state);
     }
 
     /// Returns the active kitty keyboard enhancement flags.
