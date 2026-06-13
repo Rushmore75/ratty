@@ -100,6 +100,15 @@ pub fn spawn_cursor_model(
                 ));
             });
         }
+        Ok((source, ObjectSource::Stl(mesh))) => {
+            info!("loaded cursor model from {source}");
+            commands.entity(root).with_children(|parent| {
+                parent.spawn((
+                    Mesh3d(meshes.add(mesh)),
+                    MeshMaterial3d(material.clone()),
+                ));
+            });
+        }
         Err(error) => {
             warn!("failed to resolve cursor model: {error:#}");
             commands.entity(root).with_children(|parent| {
@@ -184,6 +193,8 @@ pub fn load_object_source(path: &Path) -> anyhow::Result<(String, ObjectSource)>
         && let Some(file) = EmbeddedObjects::get(file_name)
     {
         return match extension.as_str() {
+            "stl" => load_stl_meshes_from_bytes(&file.data)
+                .map(|mesh| (format!("embedded:{file_name}"), ObjectSource::Stl(mesh))),
             "obj" => load_obj_meshes_from_bytes(file_name, &file.data)
                 .map(|meshes| (format!("embedded:{file_name}"), ObjectSource::Obj(meshes))),
             "glb" | "gltf" => {
@@ -199,6 +210,9 @@ pub fn load_object_source(path: &Path) -> anyhow::Result<(String, ObjectSource)>
     }
 
     match extension.as_str() {
+        "stl" => load_stl_meshes_from_path(runtime_asset_root().join(&candidate).as_path())
+            .or_else(|_| load_stl_meshes_from_path(path))
+            .map(|mesh| (candidate.clone(), ObjectSource::Stl(mesh))),
         "obj" => load_obj_meshes_from_path(runtime_asset_root().join(&candidate).as_path())
             .or_else(|_| load_obj_meshes_from_path(path))
             .map(|meshes| (candidate.clone(), ObjectSource::Obj(meshes))),
@@ -222,13 +236,18 @@ pub fn load_object_source_from_bytes(
 ) -> anyhow::Result<(String, ObjectSource)> {
     let display_name = name.unwrap_or(match format {
         "obj" => "payload.obj",
+        "stl" => "payload.stl",
         "glb" | "gltf" => "payload.glb",
         _ => "payload",
     });
 
+    let payload_name = format!("payload:{display_name}");
+
     match format {
+        "stl" => load_stl_meshes_from_bytes(bytes)
+            .map(|mesh| (payload_name, ObjectSource::Stl(mesh))),
         "obj" => load_obj_meshes_from_bytes(display_name, bytes)
-            .map(|meshes| (format!("payload:{display_name}"), ObjectSource::Obj(meshes))),
+            .map(|meshes| (payload_name, ObjectSource::Obj(meshes))),
         "glb" | "gltf" => {
             // Bevy scene loading still goes through the asset server, so payload-backed GLB/GLTF
             // assets need to be materialized under the asset root before they can be instantiated.
@@ -247,10 +266,7 @@ pub fn load_object_source_from_bytes(
                 .collect::<String>();
             let candidate = format!("objects/rgp/{sanitized}.{extension}");
             let asset_path = ensure_scene_asset_path(&candidate, Some((display_name, bytes)))?;
-            Ok((
-                format!("payload:{display_name}"),
-                ObjectSource::Gltf(asset_path),
-            ))
+            Ok((payload_name, ObjectSource::Gltf(asset_path)))
         }
         _ => bail!("unsupported object format for {}", display_name),
     }
@@ -319,8 +335,12 @@ fn object_asset_path(path: &Path) -> anyhow::Result<String> {
 }
 
 fn load_stl_meshes_from_path(path: &Path) -> anyhow::Result<Mesh> {
-    let reader = std::fs::read(path)?;
-    let mut c = Cursor::new(reader);
+    let data = std::fs::read(path)?;
+    load_stl_meshes_from_bytes(&data)
+}
+
+fn load_stl_meshes_from_bytes(bytes: &[u8]) -> anyhow::Result<Mesh> {
+    let mut c = Cursor::new(bytes);
     let stl = stl_io::read_stl(&mut c)?;
 
     // credit: bevy_stl (MIT)

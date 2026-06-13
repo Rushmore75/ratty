@@ -107,7 +107,7 @@ bob_speed = 2.2
 bob_amplitude = 0.08
 ```
 
-For [`cursor.model.path`](config/ratty.toml), Ratty supports both `.obj` and `.glb` assets.
+For [`cursor.model.path`](config/ratty.toml), Ratty supports both `.obj`, `.glb`, and `.stl` assets.
 
 Other useful cursor fields are:
 
