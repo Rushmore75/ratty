@@ -1,5 +1,4 @@
-/target
 assets/img
-/widget/target
+**/target
 result
 result-*
