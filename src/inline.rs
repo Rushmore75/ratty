@@ -524,7 +524,7 @@ pub enum RgpInlineObject {
         /// The loaded mesh
         mesh: Mesh,
         /// This gets created on the fly when it's actually needed.
-        /// If you are creating a RgpInlienObject, chances are that you can set this to `None`.
+        /// If you are creating a [`RgpInlineObject`], chances are that you can set this to `None`.
         handle: Option<Handle<Mesh>>,
     },
     /// OBJ mesh payload.
